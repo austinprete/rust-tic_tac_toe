@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::io;
 
@@ -9,76 +8,77 @@ fn main() {
                               [SquareState::Empty, SquareState::Empty, SquareState::Empty],
                               [SquareState::Empty, SquareState::Empty, SquareState::Empty]];
 
-    analyze_board(&game_board, AI_PLAYER_MARKER);
+    let initial_player = AI_PLAYER_MARKER.get_other_player();
 
-    let current_player = AI_PLAYER_MARKER;
+    let mut round_count = 0;
 
-    while analyze_board(&game_board, AI_PLAYER_MARKER) == Outcome::Unfinished {
+    loop {
+        if round_count > 0 || initial_player == AI_PLAYER_MARKER {
+            let mut temp_board = game_board.clone();
 
-        let mut temp_board = game_board.clone();
-
-        let mut highest_win_percentage = 0.0;
-        let mut lowest_loss_percentage = 100.0;
-        let mut lowest_outcomes = -10;
+            let mut highest_win_percentage = 0.0;
+            let mut lowest_loss_percentage = 100.0;
+            let mut lowest_outcomes = 0;
 
 
-        for row in 0..3 {
-            for column in 0..3 {
-                if temp_board[row][column] != SquareState::Empty {
-                    continue;
-                }
-                temp_board[row][column] = current_player.convert_to_square_state();
-
-                let outcomes = find_outcomes(&temp_board, current_player.get_other_player());
-                let total_outcomes: i64 = outcomes.values().sum();
-
-                if total_outcomes == 0 {
-                    if analyze_board(&temp_board, current_player) != Outcome::Unfinished {
-                        game_board = temp_board.clone();
-                        break;
-                    } else {
+            for row in 0..3 {
+                for column in 0..3 {
+                    if temp_board[row][column] != SquareState::Empty {
                         continue;
                     }
-                }
+                    temp_board[row][column] = AI_PLAYER_MARKER.convert_to_square_state();
 
-                let wins = *outcomes.get(&Outcome::Win).unwrap();
-                let mut win_percentage: f64 = (wins as f64) / (total_outcomes as f64) * 100.0;
+                    let outcomes = find_outcomes(&temp_board, AI_PLAYER_MARKER.get_other_player());
+                    let total_outcomes: i64 = outcomes.values().sum();
 
-                let draws = *outcomes.get(&Outcome::Draw).unwrap();
-                let draw_percentage: f64 = (draws as f64) / (total_outcomes as f64) * 100.0;
+                    if total_outcomes == 0 {
+                        if analyze_board(&temp_board, AI_PLAYER_MARKER) != Outcome::Unfinished {
+                            game_board = temp_board.clone();
+                            break;
+                        } else {
+                            continue;
+                        }
+                    }
 
-                let losses = *outcomes.get(&Outcome::Loss).unwrap();
-                let loss_percentage: f64 = (losses as f64) / (total_outcomes as f64) * 100.0;
+                    let wins = *outcomes.get(&Outcome::Win).unwrap();
+                    let mut win_percentage: f64 = (wins as f64) / (total_outcomes as f64) * 100.0;
 
-                win_percentage += draw_percentage * 0.25;
+                    let draws = *outcomes.get(&Outcome::Draw).unwrap();
+                    let draw_percentage: f64 = (draws as f64) / (total_outcomes as f64) * 100.0;
 
-                if win_percentage > highest_win_percentage {
-                    highest_win_percentage = win_percentage;
-                    lowest_outcomes = total_outcomes;
-                    lowest_loss_percentage = loss_percentage;
-                    game_board = temp_board.clone();
-                } else if win_percentage == highest_win_percentage {
-                    if loss_percentage < lowest_loss_percentage {
+                    let losses = *outcomes.get(&Outcome::Loss).unwrap();
+                    let loss_percentage: f64 = (losses as f64) / (total_outcomes as f64) * 100.0;
+
+                    win_percentage += draw_percentage * 0.25;
+
+                    if win_percentage > highest_win_percentage {
+                        highest_win_percentage = win_percentage;
+                        lowest_outcomes = total_outcomes;
                         lowest_loss_percentage = loss_percentage;
-                        lowest_outcomes = total_outcomes;
                         game_board = temp_board.clone();
+                    } else if win_percentage == highest_win_percentage {
+                        if loss_percentage < lowest_loss_percentage {
+                            lowest_loss_percentage = loss_percentage;
+                            lowest_outcomes = total_outcomes;
+                            game_board = temp_board.clone();
+                        }
+                    } else if win_percentage == highest_win_percentage &&
+                        loss_percentage == lowest_loss_percentage {
+                        if total_outcomes < lowest_outcomes {
+                            lowest_outcomes = total_outcomes;
+                            game_board = temp_board.clone();
+                        }
                     }
-                } else if win_percentage == highest_win_percentage &&
-                          loss_percentage == lowest_loss_percentage {
-                    if total_outcomes < lowest_outcomes {
-                        lowest_outcomes = total_outcomes;
-                        game_board = temp_board.clone();
-                    }
-                }
 
-                temp_board[row][column] = SquareState::Empty;
+                    temp_board[row][column] = SquareState::Empty;
+                }
             }
+            println!("AI's chance of winning: {:.2}%\n", highest_win_percentage);
+            println!();
         }
-        // println!("AI's chance of winning: {:.2}%\n", highest_win_percentage);
-        println!("");
         print_board(&game_board);
 
-        let current_game_state = analyze_board(&game_board, current_player.get_other_player());
+        let current_game_state = analyze_board(&game_board, AI_PLAYER_MARKER.get_other_player());
         if current_game_state != Outcome::Unfinished {
             match current_game_state {
                 Outcome::Win => println!("Congratulations, you won!"),
@@ -132,10 +132,10 @@ fn main() {
                 continue;
             }
 
-            game_board[row][column] = current_player.get_other_player().convert_to_square_state();
+            game_board[row][column] = AI_PLAYER_MARKER.get_other_player().convert_to_square_state();
             break;
-
         }
+        round_count += 1;
     }
 }
 
@@ -191,7 +191,6 @@ impl PlayerState {
 }
 
 fn analyze_board(board: &Vec<[SquareState; 3]>, current_player: PlayerState) -> Outcome {
-
     let mut streak_value;
     let mut streak_count;
 
@@ -225,7 +224,6 @@ fn analyze_board(board: &Vec<[SquareState; 3]>, current_player: PlayerState) -> 
                     return Outcome::Loss;
                 }
             }
-
         }
     }
 
@@ -347,7 +345,6 @@ fn analyze_board(board: &Vec<[SquareState; 3]>, current_player: PlayerState) -> 
 }
 
 
-
 fn find_outcomes(board: &Vec<[SquareState; 3]>,
                  current_player: PlayerState)
                  -> HashMap<Outcome, i64> {
@@ -382,7 +379,6 @@ fn find_outcomes(board: &Vec<[SquareState; 3]>,
             }
 
             temp_board[row][column] = SquareState::Empty;
-
         }
     }
 
@@ -411,6 +407,5 @@ fn print_board(board: &Vec<[SquareState; 3]>) {
         }
         println!("\n---------------");
     }
-    println!("")
+    println!()
 }
-
